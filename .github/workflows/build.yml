@@ -1,7 +1,6 @@
 name: Build and Release Tree HNP
 
 on:
-  # 1. 手动触发 (workflow_dispatch)
   workflow_dispatch:
     inputs:
       build_type:
@@ -10,28 +9,26 @@ on:
         default: 'development'
         type: choice
         options:
-          - development # 开发版：仅编译并上传构建产物
-          - release     # 发布版：编译、上传并创建预发布版本 (Pre-release)
-
-  # 2. 推送标签时自动触发 (用于正式发布)
+          - development
+          - release
   push:
     tags:
       - 'v*'
+
+# --- 核心修正：在此处为整个工作流授予写入权限 ---
+permissions:
+  contents: write
 
 jobs:
   build-hnp:
     name: Build for ${{ matrix.arch }}
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         arch: [arm64-v8a, x86_64]
-
     env:
       OHOS_SDK_RELEASE_VERSION: "5.1.0"
-      # 定义 SDK 的最终位置
       OHOS_SDK_HOME: ${{ github.workspace }}/sdk/linux
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,27 +42,19 @@ jobs:
         with:
           path: ${{ env.OHOS_SDK_HOME }}
           key: ${{ runner.os }}-ohos-sdk-${{ env.OHOS_SDK_RELEASE_VERSION }}
-
+      
       - name: Download and Extract SDK
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         shell: bash
         run: |
           echo "📥 Downloading public OHOS SDK with cross-compilers..."
-          curl -OL https://repo.huaweicloud.com/openharmony/os/${OHOS_SDK_RELEASE_VERSION}-Release/ohos-sdk-windows_linux-public.tar.gz
-          
-          # 创建一个临时目录来解压
           mkdir -p sdk_temp
-          tar -xzf ohos-sdk-windows_linux-public.tar.gz -C sdk_temp
-          rm ohos-sdk-windows_linux-public.tar.gz
-
-          # 解压内部的 zip 文件
+          curl -L https://repo.huaweicloud.com/openharmony/os/${OHOS_SDK_RELEASE_VERSION}-Release/ohos-sdk-windows_linux-public.tar.gz | tar -xz -C sdk_temp
           pushd sdk_temp/ohos-sdk/linux
             for file in $(find . -type f); do
               unzip -q $file && rm $file
             done
           popd
-          
-          # 核心修正：将解压并处理好的 linux 目录移动到最终的 SDK 位置
           mkdir -p ${{ env.OHOS_SDK_HOME }}
           mv sdk_temp/ohos-sdk/linux/* ${{ env.OHOS_SDK_HOME }}/
           rm -rf sdk_temp
