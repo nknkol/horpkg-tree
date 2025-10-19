@@ -1,15 +1,18 @@
 #!/bin/bash
 set -e
 
-# horpkg-tree/build.sh for Cross-Compilation
+# horpkg-tree/build.sh for Multi-Arch Cross-Compilation
 
 VERSION="2.2.1"
-ARCH=${1:-arm64-v8a}
+ARCH=${1} # 从 CI 接收架构参数
 
+# 根据传入的参数设置 OHOS_ARCH
 if [ "$ARCH" = "arm64-v8a" ]; then
     OHOS_ARCH="aarch64"
+elif [ "$ARCH" = "x86_64" ]; then
+    OHOS_ARCH="x86_64"
 else
-    echo "❌ Error: This build script is configured for arm64-v8a cross-compilation."
+    echo "❌ Error: Invalid or no architecture specified. Use 'arm64-v8a' or 'x86_64'."
     exit 1
 fi
 
@@ -18,32 +21,38 @@ echo "Cross-Compiling tree for $ARCH ($OHOS_ARCH)"
 echo "========================================"
 
 if [ -z "$OHOS_SDK_HOME" ]; then
-    echo "❌ Error: OHOS_SDK_HOME is not set. This script should be run in the CI environment."
+    echo "❌ Error: OHOS_SDK_HOME is not set."
     exit 1
 fi
 echo "✅ Using SDK from: ${OHOS_SDK_HOME}"
 
+# 设置交叉编译工具链
 export CC="$OHOS_SDK_HOME/native/llvm/bin/$OHOS_ARCH-unknown-linux-ohos-clang"
 export CFLAGS="-O3 -static -std=c11 -pedantic -Wall -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DLINUX"
 export LDFLAGS="-static"
 
+# 创建构建目录
 BUILD_DIR="build-$ARCH"
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
+# 下载源码
 SOURCE_URL="https://github.com/Old-Man-Programmer/tree/archive/refs/tags/${VERSION}.tar.gz"
 SOURCE_ARCHIVE="${VERSION}.tar.gz"
 echo "📥 Downloading source code..."
 wget -q --show-progress -O "${SOURCE_ARCHIVE}" "${SOURCE_URL}"
 
+# 解压
 echo "📦 Extracting source..."
 tar xzf "${SOURCE_ARCHIVE}"
 cd "tree-${VERSION}"
 
+# 编译
 echo "🛠️ Building..."
 make
 
+# 安装和打包
 INSTALL_DIR="../install"
 FINAL_INSTALL_DIR="../final_install"
 mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/share/man"
@@ -51,12 +60,8 @@ mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/share/man"
 echo "⚙️ Installing..."
 make install MANDIR="$INSTALL_DIR/share/man" DESTDIR="$INSTALL_DIR/bin"
 
-# 整理文件結構
 rm -rf "$FINAL_INSTALL_DIR"
 mkdir -p "$FINAL_INSTALL_DIR/bin" "$FINAL_INSTALL_DIR/share/man/man1"
-
-# --- 核心修正 ---
-# 'make install' 直接將 tree 安裝到 $INSTALL_DIR/bin/tree，而不是 $INSTALL_DIR/bin/bin/tree
 mv "$INSTALL_DIR/bin/tree" "$FINAL_INSTALL_DIR/bin/"
 mv "$INSTALL_DIR/share/man/man1/tree.1" "$FINAL_INSTALL_DIR/share/man/man1/"
 
@@ -71,5 +76,5 @@ cd ../../
 sha256sum "tree-${VERSION}-${ARCH}.hnp" > "tree-${VERSION}-${ARCH}.hnp.sha256"
 
 echo "========================================"
-echo "✅ Cross-compilation complete!"
+echo "✅ Cross-compilation complete for $ARCH!"
 echo "========================================"

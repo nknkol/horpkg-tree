@@ -1,4 +1,4 @@
-name: Build Tree HNP via Cross-Compilation
+name: Build Tree HNP (Multi-Arch)
 
 on:
   push:
@@ -7,9 +7,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-hnp-arm64:
-    name: Build for arm64-v8a
-    runs-on: ubuntu-latest # 使用标准的 x86_64 runner
+  build-hnp:
+    name: Build for ${{ matrix.arch }}
+    runs-on: ubuntu-latest # 两个架构都使用标准的 x86_64 runner
+
+    strategy:
+      matrix:
+        # 定义构建矩阵，包含两种架构
+        arch: [arm64-v8a, x86_64]
 
     env:
       OHOS_SDK_RELEASE_VERSION: "5.1.0"
@@ -37,31 +42,31 @@ jobs:
           popd
           echo "✅ SDK is ready."
 
-      - name: Build Package
+      - name: Build Package for ${{ matrix.arch }}
         run: |
           chmod +x build.sh
-          ./build.sh arm64-v8a
+          ./build.sh ${{ matrix.arch }} # 将矩阵中的架构名传递给编译脚本
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tree-arm64-v8a
+          name: tree-${{ matrix.arch }}
           path: |
             tree-*.hnp
             tree-*.hnp.sha256
 
   release:
     name: Create Release
-    needs: build-hnp-arm64
+    # 等待两个架构都编译完成后再执行
+    needs: build-hnp
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
-      - name: Download build artifact
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: tree-arm64-v8a
-          path: artifacts/tree-arm64-v8a
+          path: artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -69,3 +74,5 @@ jobs:
           files: |
             artifacts/tree-arm64-v8a/tree-*.hnp
             artifacts/tree-arm64-v8a/tree-*.hnp.sha256
+            artifacts/tree-x86_64/tree-*.hnp
+            artifacts/tree-x86_64/tree-*.hnp.sha256
