@@ -1,70 +1,56 @@
 #!/bin/bash
 set -e
 
-# horpkg-tree/build.sh
+# horpkg-tree/build.sh for Cross-Compilation
 
-# 默认版本和架构
 VERSION="2.2.1"
 ARCH=${1:-arm64-v8a}
 
 if [ "$ARCH" = "arm64-v8a" ]; then
     OHOS_ARCH="aarch64"
-elif [ "$ARCH" = "x86_64" ]; then
-    OHOS_ARCH="x86_64"
 else
-    echo "❌ Error: Unsupported architecture specified: $ARCH"
+    echo "❌ Error: This build script is configured for arm64-v8a cross-compilation."
     exit 1
 fi
 
 echo "========================================"
-echo "Building tree for $ARCH ($OHOS_ARCH)"
+echo "Cross-Compiling tree for $ARCH ($OHOS_ARCH)"
 echo "========================================"
 
-# --- SDK Setup ---
-# 为不同的架构选择不同的 SDK
-if [ "$OHOS_ARCH" = "aarch64" ]; then
-    SDK_URL="https://github.com/SwimmingTiger/third_party_llvm-project/releases/download/15.0.4-ohos-cli-5.1.0-2/ohos-command-line-tools-5.1.0-2-for-debian-12-arm64.tar.xz"
-else
-    # 请在这里为 x86_64 提供一个有效的 SDK URL
-    echo "❌ Error: SDK URL for x86_64 is not defined."
+# 检查 OHOS_SDK_HOME 是否由 CI 环境提供
+if [ -z "$OHOS_SDK_HOME" ]; then
+    echo "❌ Error: OHOS_SDK_HOME is not set. This script should be run in the CI environment."
     exit 1
 fi
+echo "✅ Using SDK from: ${OHOS_SDK_HOME}"
 
-SDK_ARCHIVE="ohos-command-line-tools.tar.xz"
-TOOL_DIR="/tmp/command-line-tools"
-
-if [ ! -d "${TOOL_DIR}/sdk" ]; then
-    echo "📥 Downloading HarmonyOS command line tools..."
-    wget -q --show-progress -O "${SDK_ARCHIVE}" "${SDK_URL}"
-    echo "📦 Extracting tools..."
-    mkdir -p "${TOOL_DIR}"
-    tar -xf "${SDK_ARCHIVE}" -C "${TOOL_DIR}" --strip-components=1
-    rm "${SDK_ARCHIVE}"
-fi
-export OHOS_SDK_HOME="${TOOL_DIR}/sdk/default/openharmony"
-echo "✅ SDK is ready at ${OHOS_SDK_HOME}"
-
-# --- Build Process ---
+# 设置交叉编译工具链
 export CC="$OHOS_SDK_HOME/native/llvm/bin/$OHOS_ARCH-unknown-linux-ohos-clang"
 export CFLAGS="-O3 -static -std=c11 -pedantic -Wall -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DLINUX"
 export LDFLAGS="-static"
 
+# 创建构建目录
 BUILD_DIR="build-$ARCH"
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
+# 下载源码
 SOURCE_URL="https://github.com/Old-Man-Programmer/tree/archive/refs/tags/${VERSION}.tar.gz"
 SOURCE_ARCHIVE="${VERSION}.tar.gz"
 echo "📥 Downloading source code..."
 wget -q --show-progress -O "${SOURCE_ARCHIVE}" "${SOURCE_URL}"
 
+# 解压
 echo "📦 Extracting source..."
 tar xzf "${SOURCE_ARCHIVE}"
 cd "tree-${VERSION}"
 
-echo "🛠️ Building..."
+# 编译
+echo "🛠️ Building with cross-compiler..."
 make
+
+# ...后续安装和打包步骤保持不变...
 
 INSTALL_DIR="../install"
 FINAL_INSTALL_DIR="../final_install"
@@ -89,5 +75,5 @@ cd ../../
 sha256sum "tree-${VERSION}-${ARCH}.hnp" > "tree-${VERSION}-${ARCH}.hnp.sha256"
 
 echo "========================================"
-echo "✅ Build complete!"
+echo "✅ Cross-compilation complete!"
 echo "========================================"

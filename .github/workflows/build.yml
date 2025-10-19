@@ -1,4 +1,4 @@
-name: Build Tree Package for ARM64
+name: Build Tree HNP via Cross-Compilation
 
 on:
   push:
@@ -7,23 +7,42 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-arm64:
+  build-hnp-arm64:
     name: Build for arm64-v8a
-    # 使用原生的 ARM64 运行环境
-    runs-on: ubuntu-latest-arm64
+    runs-on: ubuntu-latest # 使用标准的 x86_64 runner
+
+    env:
+      OHOS_SDK_RELEASE_VERSION: "5.1.0"
+      OHOS_SDK_HOME: ${{ github.workspace }}/ohos-sdk/linux
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y wget zip curl build-essential
 
-      - name: Build Package for ARM64
+      - name: Download OHOS SDK
+        shell: bash
         run: |
-          chmod +x ./build.sh
+          echo "📥 Downloading public OHOS SDK with cross-compilers..."
+          curl -OL https://repo.huaweicloud.com/openharmony/os/${OHOS_SDK_RELEASE_VERSION}-Release/ohos-sdk-windows_linux-public.tar.gz
+          tar -xzf ohos-sdk-windows_linux-public.tar.gz
+          rm ohos-sdk-windows_linux-public.tar.gz
+          rm -rf ohos-sdk/{ohos,windows}
+          pushd ohos-sdk/linux
+            for file in $(find . -type f); do
+              unzip -q $file && rm $file
+            done
+          popd
+          echo "✅ SDK is ready."
+
+      - name: Build Package
+        run: |
+          chmod +x build.sh
           ./build.sh arm64-v8a
 
-      - name: Upload ARM64 Artifacts
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: tree-arm64-v8a
@@ -33,15 +52,16 @@ jobs:
 
   release:
     name: Create Release
-    # 仅等待 ARM64 编译完成后再执行
-    needs: build-arm64
+    needs: build-hnp-arm64
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+
     steps:
-      - name: Download all artifacts
+      - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: tree-arm64-v8a
+          path: artifacts/tree-arm64-v8a
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
