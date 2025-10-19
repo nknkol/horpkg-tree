@@ -1,4 +1,6 @@
-name: Build Tree Package
+# .github/workflows/build.yml
+
+name: Build Tree Package with Docker
 
 on:
   push:
@@ -12,52 +14,31 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [arm64-v8a, x86_64]
+        # 注意：此流程目前专注于 ARM64，因为 SDK 是 ARM64 的。
+        # 如需 x86_64，需要使用对应的 x86_64 SDK 和基础镜像。
+        arch: [arm64-v8a]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup HarmonyOS SDK
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        # QEMU 可以在 x86 主机上模拟 ARM 环境
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker build -t horpkg-builder .
+
+      - name: Run Build Script inside Container
         run: |
-          # 定义SDK URL和文件名
-          SDK_URL="https://github.com/SwimmingTiger/third_party_llvm-project/releases/download/15.0.4-ohos-cli-5.1.0-2/ohos-command-line-tools-5.1.0-2-for-debian-12-arm64.tar.xz"
-          SDK_ARCHIVE="ohos-command-line-tools.tar.xz"
-          TOOL_DIR="$HOME/command-line-tools"
-
-          echo "📥 Downloading HarmonyOS command line tools for ARM64..."
-          wget -q --show-progress -O "${SDK_ARCHIVE}" "${SDK_URL}"
-
-          echo "📦 Extracting tools..."
-          mkdir -p "${TOOL_DIR}"
-          tar -vxf "${SDK_ARCHIVE}" -C "${TOOL_DIR}" --strip-components=1
-          rm "${SDK_ARCHIVE}"
-
-          echo "✅ SDK setup complete."
-          echo "OHOS_SDK_HOME=${TOOL_DIR}/sdk/default/openharmony" >> $GITHUB_ENV
-        # 仅在编译 arm64-v8a 时执行此步骤
-        if: matrix.arch == 'arm64-v8a'
-
-      # 为 x86_64 保留备用的 SDK 下载方式 (如果需要)
-      - name: Setup HarmonyOS SDK for x86_64
-        run: |
-          echo "⏬ Downloading SDK for x86_64... (using a different URL if necessary)"
-          # 注意：这里需要一个适用于 x86_64 GitHub Runner 的 SDK 下载链接
-          # 暂时使用与 arm64 相同的链接作为占位符，因为它也包含 x86_64 工具链
-          SDK_URL="https://github.com/SwimmingTiger/third_party_llvm-project/releases/download/15.0.4-ohos-cli-5.1.0-2/ohos-command-line-tools-5.1.0-2-for-debian-12-arm64.tar.xz"
-          SDK_ARCHIVE="ohos-command-line-tools.tar.xz"
-          TOOL_DIR="$HOME/command-line-tools"
-          wget -q --show-progress -O "${SDK_ARCHIVE}" "${SDK_URL}"
-          mkdir -p "${TOOL_DIR}"
-          tar -vxf "${SDK_ARCHIVE}" -C "${TOOL_DIR}" --strip-components=1
-          rm "${SDK_ARCHIVE}"
-          echo "OHOS_SDK_HOME=${TOOL_DIR}/sdk/default/openharmony" >> $GITHUB_ENV
-        if: matrix.arch == 'x86_64'
-
-      - name: Build Package
-        run: |
-          chmod +x build.sh
-          ./build.sh ${{ matrix.arch }}
+          # 挂载当前代码目录到容器的 /workspace 中并执行编译
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            horpkg-builder \
+            bash -c "./build.sh ${{ matrix.arch }}"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -83,5 +64,3 @@ jobs:
           files: |
             tree-arm64-v8a/tree-*.hnp
             tree-arm64-v8a/tree-*.hnp.sha256
-            tree-x86_64/tree-*.hnp
-            tree-x86_64/tree-*.hnp.sha256
