@@ -29,7 +29,8 @@ jobs:
 
     env:
       OHOS_SDK_RELEASE_VERSION: "5.1.0"
-      OHOS_SDK_HOME: ${{ github.workspace }}/ohos-sdk/linux
+      # 定义 SDK 的最终位置
+      OHOS_SDK_HOME: ${{ github.workspace }}/sdk/linux
 
     steps:
       - name: Checkout
@@ -38,29 +39,37 @@ jobs:
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y wget zip curl build-essential
 
-      - name: Download OHOS SDK
+      - name: Cache OHOS SDK
         id: cache-sdk
         uses: actions/cache@v3
         with:
           path: ${{ env.OHOS_SDK_HOME }}
           key: ${{ runner.os }}-ohos-sdk-${{ env.OHOS_SDK_RELEASE_VERSION }}
-      
-      - name: Extract SDK if not cached
+
+      - name: Download and Extract SDK
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         shell: bash
         run: |
           echo "📥 Downloading public OHOS SDK with cross-compilers..."
           curl -OL https://repo.huaweicloud.com/openharmony/os/${OHOS_SDK_RELEASE_VERSION}-Release/ohos-sdk-windows_linux-public.tar.gz
-          mkdir -p ${{ env.OHOS_SDK_HOME }}
-          tar -xzf ohos-sdk-windows_linux-public.tar.gz
+          
+          # 创建一个临时目录来解压
+          mkdir -p sdk_temp
+          tar -xzf ohos-sdk-windows_linux-public.tar.gz -C sdk_temp
           rm ohos-sdk-windows_linux-public.tar.gz
-          pushd ohos-sdk/linux
+
+          # 解压内部的 zip 文件
+          pushd sdk_temp/ohos-sdk/linux
             for file in $(find . -type f); do
               unzip -q $file && rm $file
             done
           popd
-          # 将解压后的内容移动到正确的缓存路径
-          mv ohos-sdk/linux/* ${{ env.OHOS_SDK_HOME }}/
+          
+          # 核心修正：将解压并处理好的 linux 目录移动到最终的 SDK 位置
+          mkdir -p ${{ env.OHOS_SDK_HOME }}
+          mv sdk_temp/ohos-sdk/linux/* ${{ env.OHOS_SDK_HOME }}/
+          rm -rf sdk_temp
+          echo "✅ SDK is ready."
 
       - name: Build Package for ${{ matrix.arch }}
         run: |
@@ -75,12 +84,8 @@ jobs:
             tree-*.hnp
             tree-*.hnp.sha256
 
-  # --- 发布任务 ---
   release:
     name: Create GitHub Release
-    # 仅在两种情况下运行：
-    # 1. 推送了 'v*' 开头的标签
-    # 2. 手动选择了 'release' 构建类型
     if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.build_type == 'release'
     needs: build-hnp
     runs-on: ubuntu-latest
@@ -93,12 +98,10 @@ jobs:
       - name: Set Release Properties
         id: set_release_props
         run: |
-          # 如果是标签触发，使用标签名作为版本号
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             RELEASE_NAME="${{ github.ref_name }}"
             TAG_NAME="${{ github.ref_name }}"
             PRERELEASE=false
-          # 如果是手动触发的 release，创建一个带日期的预发布版本
           else
             RELEASE_NAME="Nightly-$(date +%Y%m%d)"
             TAG_NAME="nightly-$(date +%Y%m%d-%H%M%S)"
@@ -111,7 +114,6 @@ jobs:
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v1
         with:
-          # 使用上一步生成的属性
           name: ${{ steps.set_release_props.outputs.RELEASE_NAME }}
           tag_name: ${{ steps.set_release_props.outputs.TAG_NAME }}
           prerelease: ${{ steps.set_release_props.outputs.PRERELEASE }}
