@@ -1,4 +1,4 @@
-name: Build Tree Package (Native)
+name: Build Tree Package (Native Arch Runners)
 
 on:
   push:
@@ -9,31 +9,19 @@ on:
 jobs:
   build-arm64:
     name: Build for arm64-v8a
-    # 使用原生的 ARM64 运行环境
-    runs-on: ubuntu-latest
+    # 使用由 flyci.net 提供的免费原生 ARM64 Runner
+    runs-on: ubuntu-latest-arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU for ARM build
-        uses: docker/setup-qemu-action@v3
-      
-      - name: Run ARM64 build in an ARM64 container
-        uses: uraimo/run-on-arch-action@v2.7.2
-        with:
-          arch: aarch64
-          distro: ubuntu22.04
-          githubToken: ${{ github.token }}
-          # 在 ARM64 容器内执行的命令
-          run: |
-            # 安装必要的依赖
-            apt-get update -q -y
-            apt-get install -q -y build-essential wget zip curl
-            
-            # 切换到工作区并执行编译脚本
-            cd /github/workspace
-            chmod +x ./build.sh
-            ./build.sh arm64-v8a
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y wget zip curl build-essential
+
+      - name: Build Package for ARM64
+        run: |
+          chmod +x ./build.sh
+          ./build.sh arm64-v8a
 
       - name: Upload ARM64 Artifacts
         uses: actions/upload-artifact@v4
@@ -45,7 +33,7 @@ jobs:
 
   build-x86_64:
     name: Build for x86_64
-    # 使用标准的原生 x86_64 运行环境
+    # 使用 GitHub 提供的标准 x86_64 Runner
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -55,6 +43,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y wget zip curl build-essential
 
       - name: Build Package for x86_64
+        # 为 x86 构建下载对应的 SDK
+        # 注意: build.sh 脚本需要能处理 x86_64 的情况
         run: |
           chmod +x ./build.sh
           ./build.sh x86_64
@@ -69,16 +59,13 @@ jobs:
 
   release:
     name: Create Release
-    # 等待两个架构都编译完成后再执行
     needs: [build-arm64, build-x86_64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          # 指定一个父目录来存放所有下载的构建产物
           path: artifacts
 
       - name: Create Release
