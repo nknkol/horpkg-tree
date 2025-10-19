@@ -3,13 +3,16 @@ set -e
 
 # horpkg-tree/build.sh
 
+# 默认版本和架构
 VERSION="2.2.1"
 ARCH=${1:-arm64-v8a}
 
 if [ "$ARCH" = "arm64-v8a" ]; then
     OHOS_ARCH="aarch64"
+elif [ "$ARCH" = "x86_64" ]; then
+    OHOS_ARCH="x86_64"
 else
-    echo "❌ Error: This script is currently configured for arm64-v8a builds."
+    echo "❌ Error: Unsupported architecture specified: $ARCH"
     exit 1
 fi
 
@@ -18,7 +21,15 @@ echo "Building tree for $ARCH ($OHOS_ARCH)"
 echo "========================================"
 
 # --- SDK Setup ---
-SDK_URL="https://github.com/SwimmingTiger/third_party_llvm-project/releases/download/15.0.4-ohos-cli-5.1.0-2/ohos-command-line-tools-5.1.0-2-for-debian-12-arm64.tar.xz"
+# 为不同的架构选择不同的 SDK
+if [ "$OHOS_ARCH" = "aarch64" ]; then
+    SDK_URL="https://github.com/SwimmingTiger/third_party_llvm-project/releases/download/15.0.4-ohos-cli-5.1.0-2/ohos-command-line-tools-5.1.0-2-for-debian-12-arm64.tar.xz"
+else
+    # 请在这里为 x86_64 提供一个有效的 SDK URL
+    echo "❌ Error: SDK URL for x86_64 is not defined."
+    exit 1
+fi
+
 SDK_ARCHIVE="ohos-command-line-tools.tar.xz"
 TOOL_DIR="/tmp/command-line-tools"
 

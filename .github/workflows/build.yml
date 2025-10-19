@@ -1,4 +1,4 @@
-name: Build Tree Package (Native Arch Runners)
+name: Build Tree Package for ARM64
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   build-arm64:
     name: Build for arm64-v8a
-    # 使用由 flyci.net 提供的免费原生 ARM64 Runner
+    # 使用原生的 ARM64 运行环境
     runs-on: ubuntu-latest-arm64
     steps:
       - name: Checkout
@@ -31,35 +31,10 @@ jobs:
             tree-*.hnp
             tree-*.hnp.sha256
 
-  build-x86_64:
-    name: Build for x86_64
-    # 使用 GitHub 提供的标准 x86_64 Runner
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y wget zip curl build-essential
-
-      - name: Build Package for x86_64
-        # 为 x86 构建下载对应的 SDK
-        # 注意: build.sh 脚本需要能处理 x86_64 的情况
-        run: |
-          chmod +x ./build.sh
-          ./build.sh x86_64
-
-      - name: Upload x86_64 Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: tree-x86_64
-          path: |
-            tree-*.hnp
-            tree-*.hnp.sha256
-
   release:
     name: Create Release
-    needs: [build-arm64, build-x86_64]
+    # 仅等待 ARM64 编译完成后再执行
+    needs: build-arm64
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -74,5 +49,3 @@ jobs:
           files: |
             artifacts/tree-arm64-v8a/tree-*.hnp
             artifacts/tree-arm64-v8a/tree-*.hnp.sha256
-            artifacts/tree-x86_64/tree-*.hnp
-            artifacts/tree-x86_64/tree-*.hnp.sha256
