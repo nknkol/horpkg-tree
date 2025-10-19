@@ -2,7 +2,7 @@
 
 [package]
 name = "tree"
-version = "2.1.1"
+version = "2.2.1"
 description = "Recursive directory listing command"
 category = "utilities"
 license = "GPL-2.0"
@@ -10,8 +10,8 @@ homepage = "https://mama.indstate.edu/users/ice/tree/"
 mode = "binary-only"
 
 [maintainer]
-name = "Horpkg Repository Team"
-email = "repo@horpkg.org"
+name = "nknkol" # <-- 已更新为您的 GitHub 用户名
+email = "repo@horpkg.org" # 您可以替换为自己的邮箱
 
 [dependencies]
 runtime = ["horpkg-base >= 1.0.0"]
@@ -19,16 +19,16 @@ build = ["gcc", "make"]
 
 [source]
 type = "tarball"
-url = "https://mama.indstate.edu/users/ice/tree/src/tree-2.1.1.tgz"
-sha256 = "6957c20e82561ac4231638996e74f4cfa4e6faabc5a2f511f0b4e3940e8f7b12"
-size = 57813
+url = "https://github.com/Old-Man-Programmer/tree/archive/refs/tags/2.2.1.tar.gz" # <-- 已更新为 2.2.1 的源码 URL
+sha256 = "b6bce0b533b664724218658823f4c02952011b06c116c21e42b2b1158a141b71" # <-- 已更新为 2.2.1 的源码 SHA256
+size = 75753
 
 [build]
 # Build script
 script = """
 # Extract
-tar xzf tree-2.1.1.tgz
-cd tree-2.1.1
+tar xzf 2.2.1.tar.gz
+cd tree-2.2.1
 
 # Apply HarmonyOS patches if needed
 # patch -p1 < ../patches/0001-harmonyos-support.patch
@@ -40,7 +40,7 @@ make CC=$CC \
 
 # Install
 make install \
-     PREFIX=$PKGDIR/usr \
+     DESTDIR=$PKGDIR/usr/bin \
      MANDIR=$PKGDIR/usr/share/man
 """
 
@@ -54,12 +54,13 @@ hnp_type = "public"
 
 # Files to include
 files = [
-    "usr/bin/tree",
+    "usr/bin/bin/tree",
     "usr/share/man/man1/tree.1"
 ]
 
 # Provided commands
 commands = ["tree"]
+man_pages = ["tree.1"]
 
 [metadata]
 # Package tags
