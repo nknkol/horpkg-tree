@@ -70,6 +70,14 @@ cd "$FINAL_INSTALL_DIR"
 cat > hnp.json << EOF
 { "type": "hnp-config", "name": "tree", "version": "${VERSION}", "install": {} }
 EOF
+
+MANIFEST_SRC="../../manifest.json"
+if [ ! -f "$MANIFEST_SRC" ]; then
+    echo "❌ Error: manifest.json not found at $MANIFEST_SRC"
+    exit 1
+fi
+cp "$MANIFEST_SRC" ./manifest.json
+
 zip -r "../../tree-${VERSION}-${ARCH}.hnp" .
 
 cd ../../

@@ -12,7 +12,6 @@
         "TREE_SYSROOT": "/data/service/hnp/tree.org/tree_2.2.1"
       },
       "dependencies": [
-        "horpkg-base >= 1.0.0"
       ]
     }
   ]
