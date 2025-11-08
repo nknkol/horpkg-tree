@@ -1,0 +1,19 @@
+{
+  "package": "org.horpkg.tree",
+  "version": "2.2.1",
+  "shims": [
+    {
+      "name": "tree",
+      "target": "/data/service/hnp/tree.org/tree_2.2.1/bin/tree",
+      "installPath": "bin/tree",
+      "libEnv": "LD_LIBRARY_PATH",
+      "libPath": "/data/service/hnp/tree.org/tree_2.2.1/lib",
+      "variables": {
+        "TREE_SYSROOT": "/data/service/hnp/tree.org/tree_2.2.1"
+      },
+      "dependencies": [
+        "horpkg-base >= 1.0.0"
+      ]
+    }
+  ]
+}
